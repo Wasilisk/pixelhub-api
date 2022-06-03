@@ -1,11 +1,11 @@
-import {ForbiddenException, Injectable} from '@nestjs/common';
+import {BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
-import {AuthDto} from './dto';
 import * as bcrypt from 'bcrypt'
+import * as shortid from 'shortid'
 import {JwtPayload, Tokens} from "./types";
-import {PrismaClientKnownRequestError} from "@prisma/client/runtime";
 import {ConfigService} from "@nestjs/config";
 import {JwtService} from "@nestjs/jwt";
+import {MailService} from "../mail/mail.service";
 
 @Injectable()
 export class AuthService {
@@ -13,31 +13,75 @@ export class AuthService {
     private config: ConfigService,
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private mailService: MailService,
   ) {}
 
-  async signupLocal(dto: AuthDto): Promise<Tokens> {
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+  async signupLocal(email: string): Promise<void> {
+    const userData = await this.prisma.user.findUnique({
+      where:{
+        email: email
+      }
+    })
 
-    const user = await this.prisma.user
-      .create({
-        data: {
-          email: dto.email,
-          hashedPassword,
-        },
-      })
-      .catch((error) => {
-        if (error instanceof PrismaClientKnownRequestError) {
-          if (error.code === 'P2002') {
-            throw new ForbiddenException('Credentials incorrect');
-          }
-        }
-        throw error;
-      });
+    if(userData && userData.status == 'ACTIVE') {
+      throw new ForbiddenException('User is already registered');
+    }
+    if(userData && userData.status == 'PENDING') {
+      throw new ForbiddenException('User is pending');
+    }
 
-    const tokens = await this.getTokens(user.id, user.email);
-    await this.updateRtHash(user.id, tokens.refresh_token);
+    if(!userData) {
+      const confirmationToken = await shortid.generate();
+      const newUser = await this.prisma.user
+        .create({
+          data: {
+            email: email,
+            confirmationToken
+          },
+        })
+      await this.mailService.sendUserConfirmation(newUser.email, newUser.confirmationToken);
+    }
+
+  }
+
+  async completeSignUp(token): Promise<Tokens> {
+    const userData = await this.prisma.user.update({
+      where: { confirmationToken: token },
+      data: { hashedPassword: 'asfdasfasfads', status: "ACTIVE", confirmationToken: null},
+    })
+
+    const tokens = await this.getTokens(userData.id, userData.email);
+    await this.updateRtHash(userData.id, tokens.refresh_token);
 
     return tokens;
+  }
+
+  async authorizeWithSocialMedia(user): Promise<Tokens | string> {
+    const userData = await this.prisma.user.findUnique({
+      where:{
+        email: user.email
+      }
+    })
+
+    if(userData && userData.status == "ACTIVE") {
+      const tokens = await this.getTokens(userData.id, userData.email);
+      await this.updateRtHash(userData.id, tokens.refresh_token);
+      return tokens;
+    }
+    if(userData && userData.status == "PENDING") {
+      return userData.confirmationToken;
+    }
+    if(!userData) {
+      const confirmationToken = await shortid.generate();
+      const newUser = await this.prisma.user
+        .create({
+          data: {
+            email: user.email,
+            confirmationToken
+          },
+        })
+      return newUser.confirmationToken;
+    }
   }
 
   async signinLocal() {
@@ -85,5 +129,16 @@ export class AuthService {
       access_token,
       refresh_token,
     };
+  }
+
+  async checkConfirmationToken(token): Promise<void> {
+    const userData = await this.prisma.user.findUnique({
+      where:{
+        confirmationToken: token
+      }
+    })
+    if(!userData) {
+      throw new BadRequestException('Confirmation token is not correct');
+    }
   }
 }

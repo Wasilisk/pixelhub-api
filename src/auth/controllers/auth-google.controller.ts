@@ -1,7 +1,9 @@
-import {Body, Controller, Get, Req, UseGuards} from '@nestjs/common';
+import {Controller, Get, Req, UseGuards} from '@nestjs/common';
 import {AuthService} from "../auth.service";
 import {GoogleGuard} from "../../common/guards";
 import {Tokens} from "../types";
+import {SignupDto} from "../dto";
+import {GetCurrentUserId} from "../../common/decorators";
 
 @Controller('auth/google')
 export class AuthGoogleController {
@@ -9,12 +11,12 @@ export class AuthGoogleController {
 
   @Get()
   @UseGuards(GoogleGuard)
-  async googleAuth(@Req() req) {
+  async googleAuth(@Req() req): Promise<void> {
   }
 
-  @Get('/redirect')
+  @Get('redirect')
   @UseGuards(GoogleGuard)
-  googleAuthRedirect(@Body('email') email: string): Promise<Tokens | string> {
-    return this.authService.authorizeWithSocialMedia(email);
+  googleAuthRedirect(@GetCurrentUserId() signupDto: SignupDto): Promise<Tokens | string> {
+    return this.authService.authorizeWithSocialMedia(signupDto);
   }
 }

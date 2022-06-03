@@ -13,6 +13,7 @@ import {MailModule} from "../mail/mail.module";
 import {AuthDiscordController} from "./controllers/auth-discord.controller";
 import {AuthFacebookController} from "./controllers/auth-facebook.controller";
 import {AuthGoogleController} from "./controllers/auth-google.controller";
+import {PrismaService} from "../prisma/prisma.service";
 
 @Module({
   imports: [JwtModule.register({}), MailModule],
@@ -24,6 +25,7 @@ import {AuthGoogleController} from "./controllers/auth-google.controller";
   ],
   providers: [
     AuthService,
+    PrismaService,
     AccessTokenStrategy,
     RefreshTokenStrategy,
     GoogleStrategy,

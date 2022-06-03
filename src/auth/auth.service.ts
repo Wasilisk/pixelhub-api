@@ -6,6 +6,7 @@ import {JwtPayload, Tokens} from "./types";
 import {ConfigService} from "@nestjs/config";
 import {JwtService} from "@nestjs/jwt";
 import {MailService} from "../mail/mail.service";
+import {SignupDto} from "./dto";
 
 @Injectable()
 export class AuthService {
@@ -16,10 +17,10 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  async signupLocal(email: string): Promise<void> {
+  async signupLocal(signupDto: SignupDto): Promise<void> {
     const userData = await this.prisma.user.findUnique({
       where:{
-        email: email
+        email: signupDto.email
       }
     })
 
@@ -35,7 +36,7 @@ export class AuthService {
       const newUser = await this.prisma.user
         .create({
           data: {
-            email: email,
+            email: signupDto.email,
             confirmationToken
           },
         })
@@ -44,10 +45,24 @@ export class AuthService {
 
   }
 
-  async completeSignUp(token): Promise<Tokens> {
+  async completeSignUp(token, completeSignupDto): Promise<Tokens> {
+    const hashedPassword = await bcrypt.hash(completeSignupDto.password, 10);
     const userData = await this.prisma.user.update({
       where: { confirmationToken: token },
-      data: { hashedPassword: 'asfdasfasfads', status: "ACTIVE", confirmationToken: null},
+      data: {
+        hashedPassword: hashedPassword,
+        status: "ACTIVE",
+        confirmationToken: null,
+        profile: {
+          create: {
+            username: completeSignupDto.profile.username,
+            bio: completeSignupDto.profile.bio,
+            socialProfiles: {
+              create: {}
+            }
+          }
+        }
+      },
     })
 
     const tokens = await this.getTokens(userData.id, userData.email);
@@ -56,10 +71,10 @@ export class AuthService {
     return tokens;
   }
 
-  async authorizeWithSocialMedia(user): Promise<Tokens | string> {
+  async authorizeWithSocialMedia(signupDto): Promise<Tokens | string> {
     const userData = await this.prisma.user.findUnique({
       where:{
-        email: user.email
+        email: signupDto.email
       }
     })
 
@@ -76,7 +91,7 @@ export class AuthService {
       const newUser = await this.prisma.user
         .create({
           data: {
-            email: user.email,
+            email: signupDto.email,
             confirmationToken
           },
         })

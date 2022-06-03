@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,13 +12,42 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  email             String    @unique
+  email             String  @unique
   hashedPassword    String?
   hashedRt          String?
-  confirmationToken String?   @unique
-  status            Status    @default(PENDING)
-
+  confirmationToken String? @unique
+  status            Status  @default(PENDING)
+  profile           Profile?
   @@map("users")
+}
+
+model Profile {
+  id       Int     @id @default(autoincrement())
+  userId   Int     @unique
+  user     User    @relation(fields: [userId], references: [id])
+  name     String?
+  username String
+  bio      String?
+
+  profilePicture   String?
+  coverPicture     String?
+  socialProfilesId Int            @unique
+  socialProfiles   SocialProfiles @relation(fields: [socialProfilesId], references: [id])
+
+  @@map("profiles")
+}
+
+model SocialProfiles {
+  id        Int     @id @default(autoincrement())
+  instagram String?
+  twitter   String?
+  facebook  String?
+  youtube   String?
+  linkedin  String?
+  github    String?
+  profile   Profile?
+
+  @@map("social_profiles")
 }
 
 enum Status {

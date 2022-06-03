@@ -2,6 +2,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import {ConfigService} from "@nestjs/config";
 import {Strategy, Profile} from "passport-discord";
+import {UserPayload} from "../types/user-payload.types";
 
 @Injectable()
 export class DiscordStrategy extends PassportStrategy(Strategy, 'discord') {
@@ -15,7 +16,10 @@ export class DiscordStrategy extends PassportStrategy(Strategy, 'discord') {
     });
   }
 
-  async validate (profile: Profile): Promise<string> {
-    return profile.email;
+  async validate (accessToken: string, refreshToken: string, profile: Profile): Promise<UserPayload> {
+    const signupDto: UserPayload = {
+      email: profile.email
+    };
+    return signupDto
   }
 }

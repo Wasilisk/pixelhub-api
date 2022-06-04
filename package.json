@@ -28,6 +28,7 @@
     "@nestjs/jwt": "^8.0.1",
     "@nestjs/passport": "^8.2.1",
     "@nestjs/platform-express": "^8.0.0",
+    "@nestjs/serve-static": "^2.2.2",
     "@types/passport-discord": "^0.1.5",
     "@types/passport-facebook": "^2.1.11",
     "@types/passport-local": "^1.0.34",

@@ -1,9 +1,10 @@
 import {Body, Controller, Get, UseGuards} from '@nestjs/common';
 import {AuthService} from "../auth.service";
 import {DiscordGuard} from "../../common/guards";
-import {Tokens} from "../types";
+import {ConfirmationToken, Tokens} from "../types";
 import {SignupDto} from "../dto";
-import {GetCurrentUserId} from "../../common/decorators";
+import {GetCurrentUser} from "../../common/decorators";
+import {Public} from "../../common/decorators/public.decorator";
 
 
 @Controller('auth/discord')
@@ -12,12 +13,14 @@ export class AuthDiscordController {
   }
 
   @Get()
+  @Public()
   @UseGuards(DiscordGuard)
   async discordAuth(): Promise<void>  {}
 
   @Get('/redirect')
+  @Public()
   @UseGuards(DiscordGuard)
-  discordAuthRedirect(@GetCurrentUserId() signupDto: SignupDto): Promise<Tokens | string> {
+  discordAuthRedirect(@GetCurrentUser() signupDto: SignupDto): Promise<Tokens | ConfirmationToken> {
     return this.authService.authorizeWithSocialMedia(signupDto);
   }
 }

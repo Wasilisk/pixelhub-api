@@ -1,9 +1,10 @@
 import {Body, Controller, Get, Req, Res, UseGuards} from '@nestjs/common';
 import {AuthService} from "../auth.service";
 import {FacebookGuard} from "../../common/guards";
-import {Tokens} from "../types";
+import {ConfirmationToken, Tokens} from "../types";
 import {SignupDto} from "../dto";
-import {GetCurrentUserId} from "../../common/decorators";
+import {GetCurrentUser} from "../../common/decorators";
+import {Public} from "../../common/decorators/public.decorator";
 
 @Controller('auth/facebook')
 export class AuthFacebookController {
@@ -11,12 +12,14 @@ export class AuthFacebookController {
   }
 
   @Get()
+  @Public()
   @UseGuards(FacebookGuard)
   async facebookAuth(): Promise<void> {}
 
   @Get('/redirect')
+  @Public()
   @UseGuards(FacebookGuard)
-  facebookAuthRedirect(@GetCurrentUserId() signupDto: SignupDto): Promise<Tokens | string> {
+  facebookAuthRedirect(@GetCurrentUser() signupDto: SignupDto): Promise<Tokens | ConfirmationToken> {
     return this.authService.authorizeWithSocialMedia(signupDto);
   }
 }

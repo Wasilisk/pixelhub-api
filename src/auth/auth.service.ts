@@ -2,11 +2,11 @@ import {BadRequestException, ForbiddenException, HttpException, HttpStatus, Inje
 import {PrismaService} from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt'
 import * as shortid from 'shortid'
-import {JwtPayload, Tokens} from "./types";
+import {ConfirmationToken, JwtPayload, Tokens} from "./types";
 import {ConfigService} from "@nestjs/config";
 import {JwtService} from "@nestjs/jwt";
 import {MailService} from "../mail/mail.service";
-import {SignupDto} from "./dto";
+import {CompleteSignupDto, SigninDto, SignupDto} from "./dto";
 
 @Injectable()
 export class AuthService {
@@ -45,7 +45,7 @@ export class AuthService {
 
   }
 
-  async completeSignUp(token, completeSignupDto): Promise<Tokens> {
+  async completeSignUp(token: string, completeSignupDto: CompleteSignupDto): Promise<Tokens> {
     const hashedPassword = await bcrypt.hash(completeSignupDto.password, 10);
     const userData = await this.prisma.user.update({
       where: { confirmationToken: token },
@@ -71,7 +71,7 @@ export class AuthService {
     return tokens;
   }
 
-  async authorizeWithSocialMedia(signupDto): Promise<Tokens | string> {
+  async authorizeWithSocialMedia(signupDto: SignupDto): Promise<Tokens | ConfirmationToken> {
     const userData = await this.prisma.user.findUnique({
       where:{
         email: signupDto.email
@@ -84,7 +84,9 @@ export class AuthService {
       return tokens;
     }
     if(userData && userData.status == "PENDING") {
-      return userData.confirmationToken;
+      return {
+        confirmationToken: userData.confirmationToken
+      };
     }
     if(!userData) {
       const confirmationToken = await shortid.generate();
@@ -95,20 +97,60 @@ export class AuthService {
             confirmationToken
           },
         })
-      return newUser.confirmationToken;
+      return {
+        confirmationToken: newUser.confirmationToken
+      };
     }
   }
 
-  async signinLocal() {
+  async signinLocal(signinDto: SigninDto) {
+    console.log(signinDto)
+    const user = await this.prisma.user.findUnique({
+      where: {
+        email: signinDto.email,
+      },
+    });
 
+    if (!user) throw new ForbiddenException('Access Denied');
+
+    const passwordMatches = bcrypt.compare(user.hashedPassword, signinDto.password);
+    if (!passwordMatches) throw new ForbiddenException('Access Denied');
+
+    const tokens = await this.getTokens(user.id, user.email);
+    await this.updateRtHash(user.id, tokens.refresh_token);
+
+    return tokens;
   }
 
-  async logout() {
-
+  async logout(userId: number): Promise<void> {
+    await this.prisma.user.updateMany({
+      where: {
+        id: userId,
+        hashedRt: {
+          not: null,
+        },
+      },
+      data: {
+        hashedRt: null,
+      },
+    });
   }
 
-  async refreshTokens() {
+  async refreshTokens(userId: number, refreshToken: string): Promise<Tokens> {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+    if (!user || !user.hashedRt) throw new ForbiddenException('Access Denied');
 
+    const rtMatches = bcrypt.compare(user.hashedRt, refreshToken);
+    if (!rtMatches) throw new ForbiddenException('Access Denied');
+
+    const tokens = await this.getTokens(user.id, user.email);
+    await this.updateRtHash(user.id, tokens.refresh_token);
+
+    return tokens;
   }
 
   async updateRtHash(userId: number, refreshToken: string): Promise<void> {

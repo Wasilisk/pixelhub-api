@@ -1,16 +1,20 @@
 import { MailerService } from '@nestjs-modules/mailer';
 import { Injectable } from '@nestjs/common';
+import {ConfigService} from "@nestjs/config";
 
 @Injectable()
 export class MailService {
-  constructor(private mailerService: MailerService) {}
+  constructor(
+    private mailerService: MailerService,
+    private config: ConfigService
+  ) {}
 
   async sendUserConfirmation(email: string, token: string) {
-    const url = `http://localhost:3000/application/${token}`;
+    const url = `${this.config.get("CLIENT_URL")}/application/${token}`;
 
     await this.mailerService.sendMail({
       to: email,
-      subject: 'Welcome to Nice App! Confirm your Email',
+      subject: 'Welcome to PixelHub! Confirm your Email',
       template: '.templates/confirmation',
       context: {
         url,

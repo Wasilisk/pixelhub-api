@@ -1,4 +1,4 @@
-import {BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable} from '@nestjs/common';
+import {BadRequestException, ForbiddenException, Injectable} from '@nestjs/common';
 import {PrismaService} from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt'
 import * as shortid from 'shortid'
@@ -6,7 +6,8 @@ import {ConfirmationToken, JwtPayload, Tokens} from "./types";
 import {ConfigService} from "@nestjs/config";
 import {JwtService} from "@nestjs/jwt";
 import {MailService} from "../mail/mail.service";
-import {CompleteSignupDto, SigninDto, SignupDto} from "./dto";
+import {CompleteSignupDto, ResetPasswordDto, SigninDto, SignupDto, UpdatePasswordDto} from "./dto";
+import {PrismaClientKnownRequestError} from "@prisma/client/runtime";
 
 @Injectable()
 export class AuthService {
@@ -15,23 +16,24 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private mailService: MailService,
-  ) {}
+  ) {
+  }
 
   async signupLocal(signupDto: SignupDto): Promise<void> {
     const userData = await this.prisma.user.findUnique({
-      where:{
+      where: {
         email: signupDto.email
       }
     })
 
-    if(userData && userData.status == 'ACTIVE') {
+    if (userData && userData.status == 'ACTIVE') {
       throw new ForbiddenException('User is already registered');
     }
-    if(userData && userData.status == 'PENDING') {
+    if (userData && userData.status == 'PENDING') {
       throw new ForbiddenException('User is pending');
     }
 
-    if(!userData) {
+    if (!userData) {
       const confirmationToken = await shortid.generate();
       const newUser = await this.prisma.user
         .create({
@@ -48,7 +50,7 @@ export class AuthService {
   async completeSignUp(token: string, completeSignupDto: CompleteSignupDto): Promise<Tokens> {
     const hashedPassword = await bcrypt.hash(completeSignupDto.password, 10);
     const userData = await this.prisma.user.update({
-      where: { confirmationToken: token },
+      where: {confirmationToken: token},
       data: {
         hashedPassword: hashedPassword,
         status: "ACTIVE",
@@ -73,22 +75,22 @@ export class AuthService {
 
   async authorizeWithSocialMedia(signupDto: SignupDto): Promise<Tokens | ConfirmationToken> {
     const userData = await this.prisma.user.findUnique({
-      where:{
+      where: {
         email: signupDto.email
       }
     })
 
-    if(userData && userData.status == "ACTIVE") {
+    if (userData && userData.status == "ACTIVE") {
       const tokens = await this.getTokens(userData.id, userData.email);
       await this.updateRtHash(userData.id, tokens.refresh_token);
       return tokens;
     }
-    if(userData && userData.status == "PENDING") {
+    if (userData && userData.status == "PENDING") {
       return {
         confirmationToken: userData.confirmationToken
       };
     }
-    if(!userData) {
+    if (!userData) {
       const confirmationToken = await shortid.generate();
       const newUser = await this.prisma.user
         .create({
@@ -104,7 +106,6 @@ export class AuthService {
   }
 
   async signinLocal(signinDto: SigninDto) {
-    console.log(signinDto)
     const user = await this.prisma.user.findUnique({
       where: {
         email: signinDto.email,
@@ -113,7 +114,7 @@ export class AuthService {
 
     if (!user) throw new ForbiddenException('Access Denied');
 
-    const passwordMatches = bcrypt.compare(user.hashedPassword, signinDto.password);
+    const passwordMatches = await bcrypt.compare(signinDto.password, user.hashedPassword);
     if (!passwordMatches) throw new ForbiddenException('Access Denied');
 
     const tokens = await this.getTokens(user.id, user.email);
@@ -136,6 +137,60 @@ export class AuthService {
     });
   }
 
+  async updatePassword(userId: number, updatePasswordDto: UpdatePasswordDto): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+
+    const passwordMatches = bcrypt.compare(updatePasswordDto.currentPassword, user.hashedPassword);
+    if (!passwordMatches) throw new ForbiddenException('Access Denied');
+
+    const hashedPassword = await bcrypt.hash(updatePasswordDto.newPassword, 10);
+    await this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        hashedPassword,
+      },
+    });
+  }
+
+  async getResetPasswordEmail(userEmailDto) {
+    const confirmationToken = await shortid.generate();
+    const user = await this.prisma.user.update({
+      where: {
+        email: userEmailDto.email
+      },
+      data: {
+        confirmationToken
+      }
+    })
+      .catch((error) => {
+        if (error instanceof PrismaClientKnownRequestError) {
+          if (error.code === 'P2025') {
+            throw new ForbiddenException('User with this email doesn`t exist');
+          }
+        }
+        throw error;
+      });
+
+    await this.mailService.sendResetPasswordConfirmation(user.email, user.confirmationToken);
+  }
+
+  async resetPassword(token: string, resetPasswordDto: ResetPasswordDto) {
+    const hashedPassword = await bcrypt.hash(resetPasswordDto.newPassword, 10);
+    await this.prisma.user.update({
+      where: {confirmationToken: token},
+      data: {
+        hashedPassword,
+        confirmationToken: null
+      }
+    });
+  }
+
   async refreshTokens(userId: number, refreshToken: string): Promise<Tokens> {
     const user = await this.prisma.user.findUnique({
       where: {
@@ -144,7 +199,7 @@ export class AuthService {
     });
     if (!user || !user.hashedRt) throw new ForbiddenException('Access Denied');
 
-    const rtMatches = bcrypt.compare(user.hashedRt, refreshToken);
+    const rtMatches = bcrypt.compare(refreshToken, user.hashedRt);
     if (!rtMatches) throw new ForbiddenException('Access Denied');
 
     const tokens = await this.getTokens(user.id, user.email);
@@ -190,11 +245,11 @@ export class AuthService {
 
   async checkConfirmationToken(token): Promise<void> {
     const userData = await this.prisma.user.findUnique({
-      where:{
+      where: {
         confirmationToken: token
       }
     })
-    if(!userData) {
+    if (!userData) {
       throw new BadRequestException('Confirmation token is not correct');
     }
   }

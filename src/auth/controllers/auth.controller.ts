@@ -1,12 +1,10 @@
-import {Body, Controller, Get, HttpStatus, Param, Post, Req, Res, UseGuards} from '@nestjs/common';
+import {Body, Controller, Get, Param, Post, UseGuards} from '@nestjs/common';
 import {AuthService} from "../auth.service";
-import {SigninDto, SignupDto} from "../dto";
-import {AuthGuard} from "@nestjs/passport";
+import {CompleteSignupDto, ResetPasswordDto, SigninDto, SignupDto, UpdatePasswordDto, UserEmailDto} from "../dto";
 import {Tokens} from "../types";
-import {CompleteSignupDto} from "../dto/complete-signup.dto";
 import {GetCurrentUser, GetCurrentUserId} from "../../common/decorators";
 import {Public} from "../../common/decorators/public.decorator";
-import {DiscordGuard, RtGuard} from "../../common/guards";
+import {RtGuard} from "../../common/guards";
 
 @Controller('auth')
 export class AuthController {
@@ -21,7 +19,7 @@ export class AuthController {
 
   @Public()
   @Get('signup/complete/:token')
-  async checkTokenCorrect(@Param('token') token: string): Promise<void> {
+  async checkSignupToken(@Param('token') token: string): Promise<void> {
     return this.authService.checkConfirmationToken(token);
   }
 
@@ -36,13 +34,42 @@ export class AuthController {
 
   @Public()
   @Post('local/signin')
-  signinLocal(@Body() signinDto:SigninDto) {
+  signinLocal(@Body() signinDto:SigninDto): Promise<Tokens> {
     return this.authService.signinLocal(signinDto);
   }
 
   @Post('logout')
-  logout(@GetCurrentUserId() userId: number) {
+  logout(@GetCurrentUserId() userId: number): Promise<void> {
     return this.authService.logout(userId);
+  }
+
+  @Post('update-password')
+  updatePassword(
+    @GetCurrentUserId() userId: number,
+    @Body() updatePasswordDto: UpdatePasswordDto
+  ): Promise<void> {
+    return this.authService.updatePassword(userId, updatePasswordDto);
+  }
+
+  @Public()
+  @Post('reset-password')
+  async getResetPasswordEmail(@Body() userEmailDto: UserEmailDto): Promise<void> {
+    return this.authService.getResetPasswordEmail(userEmailDto);
+  }
+
+  @Public()
+  @Get('reset-password/:token')
+  async checkResetPasswordToken(@Param('token') token: string): Promise<void> {
+    return this.authService.checkConfirmationToken(token);
+  }
+
+  @Public()
+  @Post('reset-password/:token')
+  resetPassword(
+    @Param('token') token: string,
+    @Body() resetPasswordDto: ResetPasswordDto
+  ): Promise<void> {
+    return this.authService.resetPassword(token, resetPasswordDto);
   }
 
   @Public()

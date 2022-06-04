@@ -15,7 +15,20 @@ export class MailService {
     await this.mailerService.sendMail({
       to: email,
       subject: 'Welcome to PixelHub! Confirm your Email',
-      template: '.templates/confirmation',
+      template: '.templates/userConfirmation',
+      context: {
+        url,
+      },
+    });
+  }
+
+  async sendResetPasswordConfirmation(email: string, token: string) {
+    const url = `${this.config.get("CLIENT_URL")}/password-reset/${token}`;
+
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Password Reset',
+      template: '.templates/resetPasswordConfirmation',
       context: {
         url,
       },

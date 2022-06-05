@@ -73,7 +73,7 @@ export class AuthService {
     return tokens;
   }
 
-  async authorizeWithSocialMedia(signupDto: SignupDto): Promise<Tokens | ConfirmationToken> {
+  async authorizeWithSocialMedia(signupDto: SignupDto): Promise<ConfirmationToken | Tokens> {
     const userData = await this.prisma.user.findUnique({
       where: {
         email: signupDto.email
@@ -103,6 +103,17 @@ export class AuthService {
         confirmationToken: newUser.confirmationToken
       };
     }
+  }
+
+  async socialMediaSuccessAuth(userId): Promise<Tokens> {
+    const userData = await this.prisma.user.findUnique({
+      where: {
+        id: userId
+      }
+    })
+    const tokens = await this.getTokens(userData.id, userData.email);
+    await this.updateRtHash(userData.id, tokens.refresh_token);
+    return tokens;
   }
 
   async signinLocal(signinDto: SigninDto) {

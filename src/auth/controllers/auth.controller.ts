@@ -32,6 +32,11 @@ export class AuthController {
     return this.authService.completeSignUp(token, completeSignupDto);
   }
 
+  @Get('success')
+  successAuthWithSocialMedia(@GetCurrentUser("sub") userId: number): Promise<Tokens> {
+    return this.authService.socialMediaSuccessAuth(userId);
+  }
+
   @Public()
   @Post('local/signin')
   signinLocal(@Body() signinDto:SigninDto): Promise<Tokens> {

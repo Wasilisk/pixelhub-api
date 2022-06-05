@@ -5,10 +5,15 @@ import {ConfirmationToken, Tokens} from "../types";
 import {SignupDto} from "../dto";
 import {GetCurrentUser} from "../../common/decorators";
 import {Public} from "../../common/decorators/public.decorator";
+import {Response} from "express";
+import {ConfigService} from "@nestjs/config";
 
 @Controller('auth/facebook')
 export class AuthFacebookController {
-  constructor(private authService: AuthService) {
+  constructor(
+    private authService: AuthService,
+    private config: ConfigService
+  ) {
   }
 
   @Get()
@@ -19,7 +24,15 @@ export class AuthFacebookController {
   @Get('/redirect')
   @Public()
   @UseGuards(FacebookGuard)
-  facebookAuthRedirect(@GetCurrentUser() signupDto: SignupDto): Promise<Tokens | ConfirmationToken> {
-    return this.authService.authorizeWithSocialMedia(signupDto);
+  facebookAuthRedirect(@GetCurrentUser() signupDto: SignupDto, @Res() res: Response): void {
+    const authorizeResponse: Promise<ConfirmationToken | Tokens> = this.authService.authorizeWithSocialMedia(signupDto);
+    authorizeResponse.then(data => {
+        if('confirmationToken' in data) {
+          res.redirect(`${this.config.get<string>('CLIENT_URL')}/application/${data.confirmationToken}`)
+        } else if('access_token' in data) {
+          res.redirect(`${this.config.get<string>('CLIENT_URL')}/login/success/${data.access_token}`)
+        }
+      }
+    )
   }
 }

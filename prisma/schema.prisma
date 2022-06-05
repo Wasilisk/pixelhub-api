@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-static-js"
+  provider = "prisma-assets-js"
 }
 
 datasource db {

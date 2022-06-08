@@ -22,11 +22,8 @@ export class MatchConstraint implements ValidatorConstraintInterface {
   }
 
   defaultMessage(args: ValidationArguments) {
-    console.log(args);
     const [relatedPropertyName] = args.constraints;
     const propertyName = args.property;
     return `${propertyName} must match ${relatedPropertyName} exactly`;
   }
-
-
 }

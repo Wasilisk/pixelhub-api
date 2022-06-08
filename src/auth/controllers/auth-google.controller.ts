@@ -28,7 +28,7 @@ export class AuthGoogleController {
     const authorizeResponse: Promise<ConfirmationToken | Tokens> = this.authService.authorizeWithSocialMedia(signupDto);
     authorizeResponse.then(data => {
         if('confirmationToken' in data) {
-          res.redirect(`${this.config.get<string>('CLIENT_URL')}/application/${data.confirmationToken}`)
+          res.redirect(`${this.config.get<string>('CLIENT_URL')}/signup/complete/${data.confirmationToken}`)
         } else if('access_token' in data) {
           res.redirect(`${this.config.get<string>('CLIENT_URL')}/login/success/${data.access_token}`)
         }

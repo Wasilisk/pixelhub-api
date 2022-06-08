@@ -18,6 +18,7 @@ model User {
   confirmationToken String? @unique
   status            Status  @default(PENDING)
   profile           Profile?
+
   @@map("users")
 }
 

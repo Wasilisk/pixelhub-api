@@ -2,7 +2,7 @@ import {BadRequestException, ForbiddenException, Injectable} from '@nestjs/commo
 import {PrismaService} from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt'
 import * as shortid from 'shortid'
-import {ConfirmationToken, JwtPayload, Tokens} from "./types";
+import {AuthResponse, ConfirmationToken, JwtPayload, Tokens} from "./types";
 import {ConfigService} from "@nestjs/config";
 import {JwtService} from "@nestjs/jwt";
 import {MailService} from "../mail/mail.service";
@@ -30,7 +30,17 @@ export class AuthService {
       throw new ForbiddenException('User is already registered');
     }
     if (userData && userData.status == 'PENDING') {
-      throw new ForbiddenException('User is pending');
+      const confirmationToken = await shortid.generate();
+      const updateUser = await this.prisma.user
+        .update({
+          where: {
+            email: signupDto.email,
+          },
+          data: {
+            confirmationToken
+          },
+        })
+      await this.mailService.sendUserConfirmation(updateUser.email, updateUser.confirmationToken);
     }
 
     if (!userData) {
@@ -41,13 +51,13 @@ export class AuthService {
             email: signupDto.email,
             confirmationToken
           },
-        })
+        });
       await this.mailService.sendUserConfirmation(newUser.email, newUser.confirmationToken);
     }
 
   }
 
-  async completeSignUp(token: string, completeSignupDto: CompleteSignupDto): Promise<Tokens> {
+  async completeSignUp(token: string, completeSignupDto: CompleteSignupDto): Promise<AuthResponse> {
     const hashedPassword = await bcrypt.hash(completeSignupDto.password, 10);
     const userData = await this.prisma.user.update({
       where: {confirmationToken: token},
@@ -70,10 +80,13 @@ export class AuthService {
     const tokens = await this.getTokens(userData.id, userData.email);
     await this.updateRtHash(userData.id, tokens.refresh_token);
 
-    return tokens;
+    return {
+      email: userData.email,
+      ...tokens
+    };
   }
 
-  async authorizeWithSocialMedia(signupDto: SignupDto): Promise<ConfirmationToken | Tokens> {
+  async authorizeWithSocialMedia(signupDto: SignupDto): Promise<ConfirmationToken | AuthResponse> {
     const userData = await this.prisma.user.findUnique({
       where: {
         email: signupDto.email
@@ -83,7 +96,10 @@ export class AuthService {
     if (userData && userData.status == "ACTIVE") {
       const tokens = await this.getTokens(userData.id, userData.email);
       await this.updateRtHash(userData.id, tokens.refresh_token);
-      return tokens;
+      return {
+        email: userData.email,
+        ...tokens
+      };
     }
     if (userData && userData.status == "PENDING") {
       return {
@@ -105,7 +121,7 @@ export class AuthService {
     }
   }
 
-  async socialMediaSuccessAuth(userId): Promise<Tokens> {
+  async socialMediaSuccessAuth(userId): Promise<AuthResponse> {
     const userData = await this.prisma.user.findUnique({
       where: {
         id: userId
@@ -113,25 +129,31 @@ export class AuthService {
     })
     const tokens = await this.getTokens(userData.id, userData.email);
     await this.updateRtHash(userData.id, tokens.refresh_token);
-    return tokens;
+    return {
+      email: userData.email,
+      ...tokens
+    };
   }
 
   async signinLocal(signinDto: SigninDto) {
-    const user = await this.prisma.user.findUnique({
+    const userData = await this.prisma.user.findUnique({
       where: {
         email: signinDto.email,
       },
     });
 
-    if (!user) throw new ForbiddenException('Access Denied');
+    if (!userData) throw new ForbiddenException('There is no user with this email');
 
-    const passwordMatches = await bcrypt.compare(signinDto.password, user.hashedPassword);
-    if (!passwordMatches) throw new ForbiddenException('Access Denied');
+    const passwordMatches = await bcrypt.compare(signinDto.password, userData.hashedPassword);
+    if (!passwordMatches) throw new ForbiddenException('Incorrect password');
 
-    const tokens = await this.getTokens(user.id, user.email);
-    await this.updateRtHash(user.id, tokens.refresh_token);
+    const tokens = await this.getTokens(userData.id, userData.email);
+    await this.updateRtHash(userData.id, tokens.refresh_token);
 
-    return tokens;
+    return {
+      email: userData.email,
+      ...tokens
+    };
   }
 
   async logout(userId: number): Promise<void> {

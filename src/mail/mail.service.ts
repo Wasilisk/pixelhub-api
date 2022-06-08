@@ -10,7 +10,7 @@ export class MailService {
   ) {}
 
   async sendUserConfirmation(email: string, token: string) {
-    const url = `${this.config.get("CLIENT_URL")}/application/${token}`;
+    const url = `${this.config.get("CLIENT_URL")}/signup/complete/${token}`;
 
     await this.mailerService.sendMail({
       to: email,
@@ -23,7 +23,7 @@ export class MailService {
   }
 
   async sendResetPasswordConfirmation(email: string, token: string) {
-    const url = `${this.config.get("CLIENT_URL")}/password-reset/${token}`;
+    const url = `${this.config.get("CLIENT_URL")}/login/reset-password/${token}`;
 
     await this.mailerService.sendMail({
       to: email,

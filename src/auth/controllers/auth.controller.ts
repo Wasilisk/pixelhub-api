@@ -1,7 +1,7 @@
 import {Body, Controller, Get, Param, Post, UseGuards} from '@nestjs/common';
 import {AuthService} from "../auth.service";
 import {CompleteSignupDto, ResetPasswordDto, SigninDto, SignupDto, UpdatePasswordDto, UserEmailDto} from "../dto";
-import {Tokens} from "../types";
+import {AuthResponse, Tokens} from "../types";
 import {GetCurrentUser, GetCurrentUserId} from "../../common/decorators";
 import {Public} from "../../common/decorators/public.decorator";
 import {RtGuard} from "../../common/guards";
@@ -28,18 +28,18 @@ export class AuthController {
   async completeSignUp(
     @Param('token') token: string,
     @Body() completeSignupDto: CompleteSignupDto
-  ): Promise<Tokens> {
+  ): Promise<AuthResponse> {
     return this.authService.completeSignUp(token, completeSignupDto);
   }
 
   @Get('success')
-  successAuthWithSocialMedia(@GetCurrentUser("sub") userId: number): Promise<Tokens> {
+  successAuthWithSocialMedia(@GetCurrentUser("sub") userId: number): Promise<AuthResponse> {
     return this.authService.socialMediaSuccessAuth(userId);
   }
 
   @Public()
   @Post('local/signin')
-  signinLocal(@Body() signinDto:SigninDto): Promise<Tokens> {
+  signinLocal(@Body() signinDto:SigninDto): Promise<AuthResponse> {
     return this.authService.signinLocal(signinDto);
   }
 

@@ -13,8 +13,8 @@ import {ConfigService} from '@nestjs/config';
         defaults: {
           from: `PixelHub <${config.get("MAIL_USER")}>`,
           attachments: [{
-            filename: 'pixelhub_icon.png',
-            path: __dirname +'/templates/images/pixelhub_icon.png',
+            filename: 'pixelhub_logo.png',
+            path: __dirname +'/templates/images/pixelhub_logo.png',
             cid: 'logo'
           }]
         },
